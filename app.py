@@ -1,330 +1,190 @@
-import pickle
-import pandas as pd
+import joblib
 import numpy as np
-from flask import Flask, request, render_template_string
+import pandas as pd
+import streamlit as st
 
-app = Flask(__name__)
+# Set page configuration and dark theme styling matching the UI
+st.set_page_config(
+    page_title="House Price Predictor", page_icon="🏠", layout="wide"
+)
 
-# Load the trained linear regression model using standard pickle
+# Custom CSS for dark UI aesthetic
+st.markdown(
+    """
+    <style>
+    .main {
+        background-color: #121829;
+        color: #FFFFFF;
+    }
+    .stButton>button {
+        width: 100%;
+        background-color: #5850EC;
+        color: white;
+        font-size: 18px;
+        font-weight: bold;
+        padding: 12px;
+        border-radius: 8px;
+        border: none;
+    }
+    .stButton>button:hover {
+        background-color: #4338CA;
+        color: white;
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
+
+# Load trained machine learning model
+@st.cache_resource
+def load_model():
+    # Replace 'house_price_model.pkl' with your actual trained model filename
+    return joblib.load("house_price_model.pkl")
+
+
 try:
-    with open("linear_model.pkl", "rb") as f:
-        model = pickle.load(f)
+    model = load_model()
 except Exception as e:
     model = None
-    print(f"Error loading model file: {e}")
 
-# HTML, CSS with Animations, and Layout embedded in app.py
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>House Price Predictor</title>
-    <style>
-        :root {
-            --bg-color: #0f172a;
-            --card-bg: rgba(30, 41, 59, 0.7);
-            --accent-primary: #6366f1;
-            --accent-glow: #818cf8;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --border-color: rgba(255, 255, 255, 0.1);
-        }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+# App Header
+st.title("🏠 House Price Predictor")
+st.caption("Fill in the specifications below to estimate property market value")
+st.write("---")
 
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 2rem 1rem;
-            background-image: 
-                radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
-                radial-gradient(circle at 85% 85%, rgba(168, 85, 247, 0.15) 0%, transparent 40%);
-        }
+# Section 1: Structure & Size
+st.subheader("1. Structure & Size")
+col1, col2, col3 = st.columns(3)
 
-        .container {
-            width: 100%;
-            max-width: 1000px;
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            padding: 2.5rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-            animation: fadeIn 0.8s ease-out;
-        }
+with col1:
+    bedrooms = st.number_input("Bedrooms", min_value=0, value=3, step=1)
+    lot_area = st.number_input("Lot Area (sq ft)", min_value=0, value=5000)
+    basement_area = st.number_input(
+        "Basement Area (sq ft)", min_value=0, value=500
+    )
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+with col2:
+    bathrooms = st.number_input(
+        "Bathrooms", min_value=0.0, value=2.0, step=0.25
+    )
+    floors = st.number_input("Floors", min_value=1.0, value=1.0, step=0.5)
 
-        header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
+with col3:
+    living_area = st.number_input(
+        "Living Area (sq ft)", min_value=0, value=2000
+    )
+    area_excl_basement = st.number_input(
+        "Area (Excl. Basement)", min_value=0, value=1500
+    )
 
-        header h1 {
-            font-size: 2.2rem;
-            background: linear-gradient(135deg, #a5b4fc, #6366f1);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 0.5rem;
-        }
+st.write("---")
 
-        header p {
-            color: var(--text-muted);
-            font-size: 0.95rem;
-        }
+# Section 2: Quality & Ratings
+st.subheader("2. Quality & Ratings")
+col4, col5, col6 = st.columns(3)
 
-        .section-title {
-            color: var(--accent-glow);
-            font-size: 1.1rem;
-            margin: 1.5rem 0 1rem 0;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 0.4rem;
-        }
+with col4:
+    waterfront_str = st.selectbox(
+        "Waterfront Present", options=["No", "Yes"], index=0
+    )
+    waterfront = 1 if waterfront_str == "Yes" else 0
+    house_grade = st.number_input(
+        "House Grade (1-13)", min_value=1, max_value=13, value=7
+    )
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 1.2rem;
-        }
+with col5:
+    views = st.number_input("Views (0-4)", min_value=0, max_value=4, value=0)
 
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
+with col6:
+    house_condition = st.number_input(
+        "House Condition (1-5)", min_value=1, max_value=5, value=3
+    )
 
-        .form-group label {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-bottom: 0.4rem;
-        }
+st.write("---")
 
-        .form-group input, .form-group select {
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 0.65rem 0.9rem;
-            color: #fff;
-            font-size: 0.95rem;
-            transition: all 0.3s ease;
-        }
+# Section 3: History & Location
+st.subheader("3. History & Location")
+col7, col8, col9 = st.columns(3)
 
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
-            transform: translateY(-2px);
-        }
+with col7:
+    built_year = st.number_input("Built Year", min_value=1800, value=1995)
+    latitude = st.number_input(
+        "Latitude", value=47.51, format="%.4f", step=0.01
+    )
+    lot_area_renovated = st.number_input(
+        "Lot Area (Renovated)", min_value=0, value=5000
+    )
 
-        .btn-submit {
-            margin-top: 2rem;
-            width: 100%;
-            padding: 1rem;
-            background: linear-gradient(135deg, #6366f1, #4f46e5);
-            color: #fff;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
-        }
+with col8:
+    renovation_year = st.number_input(
+        "Renovation Year (0 if none)", min_value=0, value=0
+    )
+    longitude = st.number_input(
+        "Longitude", value=-122.21, format="%.4f", step=0.01
+    )
+    schools_nearby = st.number_input(
+        "Schools Nearby", min_value=0, value=2, step=1
+    )
 
-        .btn-submit:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
-            background: linear-gradient(135deg, #4f46e5, #4338ca);
-        }
+with col9:
+    postal_code = st.number_input(
+        "Postal Code", min_value=10000, value=98001, step=1
+    )
+    living_area_renovated = st.number_input(
+        "Living Area (Renovated)", min_value=0, value=2000
+    )
+    distance_airport = st.number_input(
+        "Distance from Airport", min_value=0, value=15
+    )
 
-        .result-box {
-            margin-top: 2rem;
-            padding: 1.5rem;
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            border-radius: 12px;
-            text-align: center;
-            animation: pulseGlow 1.5s ease-out;
-        }
+st.write("---")
 
-        @keyframes pulseGlow {
-            0% { transform: scale(0.95); opacity: 0; }
-            50% { transform: scale(1.02); }
-            100% { transform: scale(1); opacity: 1; }
-        }
+# Section 4: Prediction Trigger
+if st.button("Calculate Property Price"):
+    # Feature list ordered to match the model training layout
+    input_features = np.array(
+        [
+            [
+                bedrooms,
+                bathrooms,
+                living_area,
+                lot_area,
+                floors,
+                area_excl_basement,
+                basement_area,
+                waterfront,
+                views,
+                house_condition,
+                house_grade,
+                built_year,
+                renovation_year,
+                postal_code,
+                latitude,
+                longitude,
+                living_area_renovated,
+                lot_area_renovated,
+                schools_nearby,
+                distance_airport,
+            ]
+        ]
+    )
 
-        .result-box h2 {
-            color: #10b981;
-            font-size: 1.8rem;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <header>
-        <h1>🏡 House Price Predictor</h1>
-        <p>Fill in the specifications below to estimate property market value</p>
-    </header>
-
-    {% if prediction %}
-    <div class="result-box">
-        <h2>Estimated Price: ${{ prediction }}</h2>
-    </div>
-    {% endif %}
-
-    <form method="POST" action="/predict">
-        
-        <div class="section-title">1. Structure & Size</div>
-        <div class="grid">
-            <div class="form-group">
-                <label>Bedrooms</label>
-                <input type="number" name="number of bedrooms" value="{{ form_data.get('number of bedrooms', 3) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Bathrooms</label>
-                <input type="number" step="0.25" name="number of bathrooms" value="{{ form_data.get('number of bathrooms', 2) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Living Area (sq ft)</label>
-                <input type="number" step="any" name="living area" value="{{ form_data.get('living area', 2000) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Lot Area (sq ft)</label>
-                <input type="number" step="any" name="lot area" value="{{ form_data.get('lot area', 5000) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Floors</label>
-                <input type="number" step="0.5" name="number of floors" value="{{ form_data.get('number of floors', 1) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Area (Excl. Basement)</label>
-                <input type="number" step="any" name="Area of the house(excluding basement)" value="{{ form_data.get('Area of the house(excluding basement)', 1500) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Basement Area (sq ft)</label>
-                <input type="number" step="any" name="Area of the basement" value="{{ form_data.get('Area of the basement', 500) }}" required>
-            </div>
-        </div>
-
-        <div class="section-title">2. Quality & Ratings</div>
-        <div class="grid">
-            <div class="form-group">
-                <label>Waterfront Present</label>
-                <select name="waterfront present">
-                    <option value="0" {% if form_data.get('waterfront present') == '0' %}selected{% endif %}>No</option>
-                    <option value="1" {% if form_data.get('waterfront present') == '1' %}selected{% endif %}>Yes</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Views (0-4)</label>
-                <input type="number" min="0" max="4" name="number of views" value="{{ form_data.get('number of views', 0) }}" required>
-            </div>
-            <div class="form-group">
-                <label>House Condition (1-5)</label>
-                <input type="number" min="1" max="5" name="condition of the house" value="{{ form_data.get('condition of the house', 3) }}" required>
-            </div>
-            <div class="form-group">
-                <label>House Grade (1-13)</label>
-                <input type="number" min="1" max="13" name="grade of the house" value="{{ form_data.get('grade of the house', 7) }}" required>
-            </div>
-        </div>
-
-        <div class="section-title">3. History & Location</div>
-        <div class="grid">
-            <div class="form-group">
-                <label>Built Year</label>
-                <input type="number" name="Built Year" value="{{ form_data.get('Built Year', 1995) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Renovation Year (0 if none)</label>
-                <input type="number" name="Renovation Year" value="{{ form_data.get('Renovation Year', 0) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Postal Code</label>
-                <input type="number" name="Postal Code" value="{{ form_data.get('Postal Code', 98001) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Latitude</label>
-                <input type="number" step="any" name="Lattitude" value="{{ form_data.get('Lattitude', 47.51) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Longitude</label>
-                <input type="number" step="any" name="Longitude" value="{{ form_data.get('Longitude', -122.21) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Living Area (Renovated)</label>
-                <input type="number" step="any" name="living_area_renov" value="{{ form_data.get('living_area_renov', 2000) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Lot Area (Renovated)</label>
-                <input type="number" step="any" name="lot_area_renov" value="{{ form_data.get('lot_area_renov', 5000) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Schools Nearby</label>
-                <input type="number" name="Number of schools nearby" value="{{ form_data.get('Number of schools nearby', 2) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Distance from Airport</label>
-                <input type="number" step="any" name="Distance from the airport" value="{{ form_data.get('Distance from the airport', 15) }}" required>
-            </div>
-        </div>
-
-        <button type="submit" class="btn-submit">Calculate Property Price</button>
-    </form>
-</div>
-
-</body>
-</html>
-"""
-
-@app.route("/", methods=["GET"])
-def index():
-    return render_template_string(HTML_TEMPLATE, form_data={}, prediction=None)
-
-@app.route("/predict", methods=["POST"])
-def predict():
-    if not model:
-        return "Model not loaded properly.", 500
-
-    form_data = request.form.to_dict()
-
-    # Features in exact order expected by linear_model.pkl
-    feature_keys = [
-        'number of bedrooms', 'number of bathrooms', 'living area', 'lot area',
-        'number of floors', 'waterfront present', 'number of views',
-        'condition of the house', 'grade of the house',
-        'Area of the house(excluding basement)', 'Area of the basement',
-        'Built Year', 'Renovation Year', 'Postal Code', 'Lattitude', 'Longitude',
-        'living_area_renov', 'lot_area_renov', 'Number of schools nearby',
-        'Distance from the airport'
-    ]
-
-    try:
-        # Build input vector matching required types
-        input_values = [float(form_data[key]) for key in feature_keys]
-        df_input = pd.DataFrame([input_values], columns=feature_keys)
-        
-        # Predict
-        pred_value = model.predict(df_input)[0]
-        formatted_pred = f"{pred_value:,.2f}"
-    except Exception as e:
-        formatted_pred = f"Error in calculation: {e}"
-
-    return render_template_string(HTML_TEMPLATE, form_data=form_data, prediction=formatted_pred)
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    if model is not None:
+        try:
+            prediction = model.predict(input_features)[0]
+            st.success(f"### Estimated Property Value: **${prediction:,.2f}**")
+        except Exception as err:
+            st.error(f"Error during prediction: {err}")
+    else:
+        # Placeholder calculation fallback if model is missing
+        estimated_price = (
+            living_area * 250 + bedrooms * 10000 + bathrooms * 15000
+        )
+        st.warning(
+            "⚠️ Trained model file `house_price_model.pkl` not found. Showing mock value:"
+        )
+        st.success(
+            f"### Estimated Property Value: **${estimated_price:,.2f}**"
+        )
